@@ -1,5 +1,5 @@
 # Server Rebuild Log — wcma.work / testpozi.online
-Last updated: 2026-04-08
+Last updated: 2026-04-08 (revised)
 
 ## Purpose
 This file documents every step taken to set up this server. If the server is lost, hand this file to a Claude agent to rebuild everything from scratch.
@@ -75,6 +75,9 @@ Current host listening ports: 80, 443 only.
 │   │   ├── compose.yaml
 │   │   ├── data/             (SQLite database, owned by UID 1000)
 │   │   └── app-src/          (git clone of arifwcma/mapnj2)
+│   ├── xyz/
+│   │   ├── compose.yaml
+│   │   └── app-src/          (git clone of arifwcma/xyz)
 │   └── qgis-server/
 │       ├── compose.yaml
 │       ├── projects/
@@ -84,7 +87,8 @@ Current host listening ports: 80, 443 only.
 │   └── mapnj2/
 │       └── service-account.json  (Google service account, permissions: 600, owner: UID 1000)
 └── ubuntu_playground/
-    └── log.md                (this file)
+    ├── log.md                (this file)
+    └── direction.md          (onboarding instructions for new agents)
 ```
 
 ---
@@ -115,6 +119,14 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
     read_only: true
     tmpfs:
       - /var/cache/nginx
@@ -132,6 +144,42 @@ services:
 networks:
   internal-apps:
     external: true
+```
+
+File: `/home/ssm-user/apps/reverse-proxy/nginx/nginx.conf`
+
+```nginx
+user nginx;
+worker_processes auto;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    server_tokens off;
+
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log warn;
+
+    limit_req_zone $binary_remote_addr zone=general:10m rate=20r/m;
+    limit_req_zone $binary_remote_addr zone=qgis:10m rate=20r/m;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    include /etc/nginx/conf.d/*.conf;
+}
 ```
 
 File: `/home/ssm-user/apps/reverse-proxy/nginx/conf.d/default.conf`
@@ -166,10 +214,44 @@ server {
 }
 
 server {
+    listen 80;
+    listen [::]:80;
+    server_name xyz.wcma.work;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name _;
     return 444;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name xyz.wcma.work;
+
+    ssl_certificate /etc/letsencrypt/live/xyz.wcma.work/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/xyz.wcma.work/privkey.pem;
+
+    location / {
+        limit_req zone=general burst=10 nodelay;
+        proxy_pass http://xyz:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 
 server {
@@ -182,6 +264,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/testpozi.online/privkey.pem;
 
     location /cgi-bin/qgis_mapserv.fcgi {
+        limit_req zone=qgis burst=5 nodelay;
         if ($arg_MAP != "/var/www/qgis_projects/wimmera_parcels/wimmera_parcels.qgz") {
             return 403;
         }
@@ -196,24 +279,17 @@ server {
 }
 
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
     server_name wcma.work;
 
     ssl_certificate /etc/letsencrypt/live/wcma.work/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/wcma.work/privkey.pem;
 
     location / {
+        limit_req zone=general burst=10 nodelay;
         proxy_pass http://mapnj2:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /qgis/ {
-        proxy_pass http://qgis-server:80/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -356,7 +432,63 @@ cd /home/ssm-user/apps/mapnj2 && docker compose up -d --build
 
 ---
 
-## 9. QGIS Server
+## 9. xyz App (Next.js)
+
+Repo: `git@github.com:arifwcma/xyz.git`
+Location: `/home/ssm-user/apps/xyz/app-src`
+
+Clone:
+```bash
+mkdir -p /home/ssm-user/apps/xyz
+cd /home/ssm-user/apps/xyz
+git clone git@github.com:arifwcma/xyz.git app-src
+```
+
+Domain: `xyz.wcma.work` → container `xyz` on port 3002.
+
+TLS cert issued for `xyz.wcma.work` (same certbot method as other domains).
+
+### compose.yaml
+
+File: `/home/ssm-user/apps/xyz/compose.yaml`
+
+```yaml
+services:
+  xyz:
+    build:
+      context: ./app-src
+      dockerfile: Dockerfile
+    container_name: xyz
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/service-account.json
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - /home/ssm-user/secrets/mapnj2/service-account.json:/run/secrets/service-account.json:ro
+    networks:
+      - internal-apps
+
+networks:
+  internal-apps:
+    external: true
+```
+
+Build and start:
+```bash
+cd /home/ssm-user/apps/xyz && docker compose up -d --build
+```
+
+---
+
+## 10. QGIS Server (testpozi.online)
 
 Repo: `git@github.com:arifwcma/wimmera_parcels.git`
 Location: `/home/ssm-user/apps/qgis-server/projects/wimmera_parcels`
@@ -435,7 +567,7 @@ curl -I "https://testpozi.online/cgi-bin/qgis_mapserv.fcgi?MAP=/var/www/qgis_pro
 
 ---
 
-## 10. Startup Order (on fresh rebuild)
+## 11. Startup Order (on fresh rebuild)
 
 1. Create Docker network: `docker network create internal-apps`
 2. Start Nginx: `cd /home/ssm-user/apps/reverse-proxy && docker compose up -d`
@@ -443,13 +575,15 @@ curl -I "https://testpozi.online/cgi-bin/qgis_mapserv.fcgi?MAP=/var/www/qgis_pro
 4. Update Nginx config with HTTPS blocks, reload: `docker exec nginx-reverse-proxy nginx -s reload`
 5. Start QGIS: `cd /home/ssm-user/apps/qgis-server && docker compose up -d`
 6. Build and start mapnj2: `cd /home/ssm-user/apps/mapnj2 && docker compose up -d --build`
+7. Build and start xyz: `cd /home/ssm-user/apps/xyz && docker compose up -d --build`
 
 ---
 
-## 11. Useful Commands
+## 12. Useful Commands
 
 ```bash
 docker logs mapnj2 -f
+docker logs xyz -f
 docker logs qgis-server -f
 docker logs nginx-reverse-proxy -f
 
@@ -466,7 +600,7 @@ docker ps
 
 ---
 
-## 12. Security State
+## 13. Security State
 
 1. No public SSH — SSM Session Manager only.
 2. UFW enabled, ports 80 and 443 only.
@@ -483,15 +617,8 @@ docker ps
 
 ---
 
-## 13. Pending Tasks (as of 2026-04-08)
+## 14. Pending Tasks (as of 2026-04-08)
 
-1. TASK-01: Add `security_opt` and `cap_drop` to Nginx container
-2. TASK-02: Fix deprecated `http2` directive in Nginx config (wcma.work block)
-3. TASK-04: Verify `wcma.work/qgis/` — remove if not needed
-4. TASK-05: Deploy second Next.js app
-5. TASK-06: Deploy third Next.js app
-6. TASK-09: AWS Parameter Store for secrets (optional)
-7. TASK-10: Terraform — codify full infrastructure (mandatory)
-8. Security: Add rate limiting on Nginx
-9. Security: Add authentication on QGIS Server
-10. Security: Add HTTP security headers in Nginx
+1. TASK-09: AWS Parameter Store for secrets (optional)
+2. TASK-10: Terraform — codify full infrastructure (mandatory)
+3. Security: Add authentication on QGIS Server
