@@ -833,6 +833,8 @@ Four root causes fixed in order:
 
 Map confirmed loading (HTTP 200, `lizmap-vars` populated): `https://wfml.wcma.work/index.php/view/map?repository=wfml&project=wfml`
 
+**Rate limit fix (2026-04-09):** Lizmap fires 20+ simultaneous requests on page load. Original `general` zone was `20r/m` with `burst=10` -- instantly hit on map load. Changed to `60r/s` with `burst=100` in `nginx.conf` and `default.conf`.
+
 ---
 
 ## 17. Pending Tasks (as of 2026-04-09)
