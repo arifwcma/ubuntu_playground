@@ -819,15 +819,19 @@ All apps to serve on both HTTP and HTTPS (no redirects).
 - Admin panel: `https://wfml.wcma.work/admin.php`
 - Admin password changed from default.
 
-### Lizmap plugin fix attempt (2026-04-09) — DID NOT RESOLVE "map cannot be displayed"
+### Lizmap map display fix — DONE (2026-04-09)
 
-Attempted fixes (both applied, both still active):
-1. Mounted custom `nginx.conf` at `/home/ssm-user/apps/qgis-server/nginx/nginx.conf` -- changed rewrite from `^/ows/$` to `^/ows/(.*)$` so sub-paths like `/ows/lizmap/server.json` route through FastCGI instead of falling back to static file (was returning 404).
-2. Added `QGIS_SERVER_LIZMAP_REVEAL_SETTINGS=true` to qgis-server env vars in `compose.yaml`.
+Four root causes fixed in order:
 
-Result: `http://qgis-server:80/ows/lizmap/server.json` now returns 200 with valid JSON (plugin loads, LIZMAP service listed). But the Lizmap UI still shows "This map cannot be displayed."
+1. **nginx rewrite too narrow** — nginx inside `qgis/qgis-server:ltr` only matched exact `/ows/`. Sub-paths like `/ows/lizmap/server.json` fell through to static file lookup (404). Fixed by mounting custom `nginx.conf` at `/home/ssm-user/apps/qgis-server/nginx/nginx.conf` with rewrite changed to `^/ows/(.*)$`.
 
-Do NOT retry these two fixes -- they are already applied and confirmed working. The problem is elsewhere.
+2. **Missing env var** — `QGIS_SERVER_LIZMAP_REVEAL_SETTINGS=true` added to `compose.yaml` (required for Lizmap plugin API to respond).
+
+3. **Outdated Lizmap server plugin** — Lizmap 3.9 requires plugin >= 2.13.0. Installed version was 2.9.4. Upgraded to 2.14.1 at `/home/ssm-user/apps/qgis-server/plugins/lizmap_server/`.
+
+4. **Missing allowFcgi** — Lizmap 3.9 defaults to requiring Py-QGIS-Server. Since we use plain FCGI (`spawn-fcgi`), added `allowFcgi=on` under `[qgisWrapper]` in `/home/ssm-user/apps/lizmap/var/config/localconfig.ini.php`.
+
+Map confirmed loading (HTTP 200, `lizmap-vars` populated): `https://wfml.wcma.work/index.php/view/map?repository=wfml&project=wfml`
 
 ---
 
