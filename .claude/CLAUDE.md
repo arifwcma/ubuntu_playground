@@ -51,12 +51,12 @@ Follow all rules below strictly.
 
 ## Step 2 — Read the server log
 
-Read `/home/ssm-user/sources/ubuntu_playground/log.md`. This is the full rebuild log for the server. It documents every step taken and all pending tasks.
+Read `/home/ssm-user/sources/ubuntu_playground/.claude/log.md`. This is the full rebuild log for the server. It documents every step taken and all pending tasks.
 
 ## Step 3 — Periodic log maintenance
 
 After any significant action in a session:
-1. Update `/home/ssm-user/sources/ubuntu_playground/log.md` to reflect what was done.
+1. Update `/home/ssm-user/sources/ubuntu_playground/.claude/log.md` to reflect what was done.
 2. Run: `cd /home/ssm-user/sources/ubuntu_playground && git add -A && git commit -m "update log" && git push`
 3. Do this periodically during the session, not only at the end, in case the session closes abruptly.
 
