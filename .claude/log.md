@@ -843,4 +843,4 @@ Map confirmed loading (HTTP 200, `lizmap-vars` populated): `https://wfml.wcma.wo
 2. ~~Change Lizmap admin password from default (admin/admin) at `https://wfml.wcma.work/admin.php`~~ DONE (2026-04-09)
 3. AWS Parameter Store for secrets (optional)
 4. Terraform — codify full infrastructure (mandatory)
-5. Security: Add authentication on QGIS Server
+5. Security: Add authentication on QGIS Server — **won't do for now** (MAP whitelist in Nginx limits access to whitelisted projects only; full auth would create friction for 3rd party WMS consumers; revisit if requirements change)
