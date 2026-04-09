@@ -806,11 +806,24 @@ All apps to serve on both HTTP and HTTPS (no redirects).
 
 ---
 
-## 16. Pending Tasks (as of 2026-04-09)
+## 16. Lizmap (wfml.wcma.work) — DONE (2026-04-09)
 
-1. Fix hardcoded `testpozi.online` in `mapnj2/app-src/app/api/fields/geojson/route.js:3` — update `WFS_BASE_URL` to call qgis-server container directly
-2. Decide fate of Lizmap stack on wfml.wcma.work
-3. Update wfmc Android app URLs (`lib/services/settings_store.dart`) to wfml.wcma.work
-4. AWS Parameter Store for secrets (optional)
-5. Terraform — codify full infrastructure (mandatory)
-6. Security: Add authentication on QGIS Server
+- Repository `wfml` configured in `lizmapConfig.ini.php` pointing to `/srv/projects/wfml/`
+- Public (anonymous) access granted to wfml repository via `jacl2_rights` in `jauth.db`
+- Named Docker volumes replaced with bind mounts:
+  - `./var` → `/www/lizmap/var`
+  - `./www` → `/www/lizmap/www`
+- Config is now on-disk and reproducible
+- Runtime dirs (db/, log/, sessions/) excluded from git via `var/.gitignore`
+- Map URL: `https://wfml.wcma.work/index.php/view/map?repository=wfml&project=wfml`
+- Admin panel: `https://wfml.wcma.work/admin.php` (change default admin/admin password on first login)
+
+---
+
+## 17. Pending Tasks (as of 2026-04-09)
+
+1. Update wfmc Android app URLs (`lib/services/settings_store.dart`): base URL → `https://wfml.wcma.work/ows/`, MAP path → `/var/www/qgis_projects/wfml/wfml.qgs`
+2. Change Lizmap admin password from default (admin/admin) at `https://wfml.wcma.work/admin.php`
+3. AWS Parameter Store for secrets (optional)
+4. Terraform — codify full infrastructure (mandatory)
+5. Security: Add authentication on QGIS Server
