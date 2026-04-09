@@ -1,5 +1,5 @@
 # Server Rebuild Log — wcma.work / testpozi.online
-Last updated: 2026-04-08 (revised)
+Last updated: 2026-04-08 (session 2)
 
 ## Purpose
 This file documents every step taken to set up this server. If the server is lost, hand this file to a Claude agent to rebuild everything from scratch.
@@ -30,6 +30,8 @@ This file documents every step taken to set up this server. If the server is los
 |---|---|
 | wcma.work | 16.176.28.146 |
 | testpozi.online | 16.176.28.146 |
+| xyz.wcma.work | 16.176.28.146 |
+| wfml.wcma.work | 16.176.28.146 |
 
 ---
 
@@ -78,11 +80,16 @@ Current host listening ports: 80, 443 only.
 │   ├── xyz/
 │   │   ├── compose.yaml
 │   │   └── app-src/          (git clone of arifwcma/xyz)
+│   ├── lizmap/
+│   │   ├── compose.yaml
+│   │   └── nginx/
+│   │       └── lizmap.conf
 │   └── qgis-server/
 │       ├── compose.yaml
 │       ├── projects/
-│       │   └── wimmera_parcels/   (git clone of arifwcma/wimmera_parcels)
-│       └── data/
+│       │   ├── wimmera_parcels/   (git clone of arifwcma/wimmera_parcels)
+│       │   └── wfml/              (wfml.qgs, wfml.qgs.cfg, wfml_attachments.zip)
+│       └── data/                  (wfml raster data — pending upload)
 ├── secrets/
 │   └── mapnj2/
 │       └── service-account.json  (Google service account, permissions: 600, owner: UID 1000)
@@ -188,6 +195,123 @@ File: `/home/ssm-user/apps/reverse-proxy/nginx/conf.d/default.conf`
 server {
     listen 80;
     listen [::]:80;
+    server_name wcma.work;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name testpozi.online;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name xyz.wcma.work;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name wfml.wcma.work;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name wfml.wcma.work;
+
+    ssl_certificate /etc/letsencrypt/live/wfml.wcma.work/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/wfml.wcma.work/privkey.pem;
+
+    location /ows/ {
+        limit_req zone=qgis burst=5 nodelay;
+        if ($arg_MAP !~ "^/var/www/qgis_projects/wfml/") {
+            return 403;
+        }
+        proxy_pass http://qgis-server:80/ows/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        limit_req zone=general burst=10 nodelay;
+        proxy_pass http://lizmap-nginx:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name xyz.wcma.work;
+
+    ssl_certificate /etc/letsencrypt/live/xyz.wcma.work/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/xyz.wcma.work/privkey.pem;
+
+    location / {
+        limit_req zone=general burst=10 nodelay;
+        proxy_pass http://xyz:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
     server_name wcma.work;
 
     location /.well-known/acme-challenge/ {
@@ -617,8 +741,43 @@ docker ps
 
 ---
 
-## 14. Pending Tasks (as of 2026-04-08)
+## 14. wfml Project (wfml.wcma.work)
 
-1. TASK-09: AWS Parameter Store for secrets (optional)
-2. TASK-10: Terraform — codify full infrastructure (mandatory)
-3. Security: Add authentication on QGIS Server
+### What was done
+- wfml QGIS project files placed at `/home/ssm-user/apps/qgis-server/projects/wfml/`
+- TLS cert issued for `wfml.wcma.work` (expiry 2026-07-07)
+- Nginx blocks added: HTTP redirect + HTTPS with `/ows/` proxying to qgis-server
+- MAP whitelist: `^/var/www/qgis_projects/wfml/`
+- Lizmap stack deployed at `/home/ssm-user/apps/lizmap/` (containers: `lizmap`, `lizmap-nginx`) — fate TBD
+- Nginx `/` on wfml.wcma.work currently proxies to `lizmap-nginx`
+
+### WMS endpoint (for wfmc Android app)
+```
+https://wfml.wcma.work/ows/?MAP=/var/www/qgis_projects/wfml/wfml.qgs&SERVICE=WMS&...
+```
+
+**Reminder:** Update wfmc base URL from `https://wimmera.xyz/qgis/` to `https://wfml.wcma.work/ows/` and MAP path from `/srv/data/wfml/wfml.qgs` to `/var/www/qgis_projects/wfml/wfml.qgs`.
+
+### Blocker
+Raster data files missing. Upload `data.zip` from PC via S3:
+```bash
+aws s3 cp "C:\Users\m.rahman\WebstormProjects\wfml\data.zip" s3://wcma-wfml-data/
+```
+Then on server:
+```bash
+aws s3 cp s3://wcma-wfml-data/data.zip /tmp/data.zip
+unzip /tmp/data.zip -d /home/ssm-user/apps/qgis-server/data/
+rm /tmp/data.zip
+docker restart qgis-server
+```
+
+---
+
+## 15. Pending Tasks (as of 2026-04-08)
+
+1. Upload wfml raster data files (data.zip via S3 — in progress)
+2. Decide fate of Lizmap stack on wfml.wcma.work
+3. Update wfmc Android app URL to wfml.wcma.work
+4. TASK-09: AWS Parameter Store for secrets (optional)
+5. TASK-10: Terraform — codify full infrastructure (mandatory)
+6. Security: Add authentication on QGIS Server
