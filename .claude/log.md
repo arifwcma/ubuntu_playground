@@ -770,7 +770,7 @@ WMS endpoint confirmed 200 OK.
 
 ---
 
-## 15. SSL Migration — In Progress (2026-04-09)
+## 15. SSL Migration — DONE (2026-04-09)
 
 ### Goal
 Replace all individual per-domain certs with a single wildcard cert `*.wcma.work` (plus apex `wcma.work`).
@@ -787,29 +787,28 @@ All apps to serve on both HTTP and HTTPS (no redirects).
 ### Steps completed
 - AWS CLI v2 installed on host
 - `certbot` and `python3-certbot-dns-route53` installed on host
-- Wildcard cert issuance in progress (DNS-01 via Route 53)
+- Wildcard cert issued via DNS-01 (Route 53): `wcma.work` + `*.wcma.work`, expiry 2026-07-08
+- Cert stored at: `certbot/conf/live/wcma.work-0001/`
+- Nginx config rewritten: all domains serve HTTP + HTTPS, wildcard cert, testpozi.online → parcels.wcma.work, no redirects
+- Old individual certs deleted (wcma.work, testpozi.online, xyz.wcma.work, wfml.wcma.work)
+- Old Docker-based certbot cron removed
+- Auto-renew via systemd certbot.timer (active + enabled)
+- Deploy hook at `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` reloads nginx after renewal
+- All endpoints confirmed 200 (HTTP + HTTPS)
 
-### Cert command (run once)
-```bash
-sudo certbot certonly --dns-route53 \
-  --config-dir /home/ssm-user/apps/reverse-proxy/certbot/conf \
-  --work-dir /tmp/certbot-work \
-  --logs-dir /tmp/certbot-logs \
-  -d wcma.work -d '*.wcma.work' \
-  --agree-tos --email arif@wcma.work --no-eff-email
-```
-
-### After cert issued
-- Rewrite nginx config: all domains serve on HTTP + HTTPS, wildcard cert paths, testpozi.online → parcels.wcma.work
-- Update auto-renew cron to use host certbot (not Docker)
-- Remove old individual certs
+### Active URLs
+| Domain | App |
+|---|---|
+| wcma.work | mapnj2 (Next.js) |
+| xyz.wcma.work | xyz (Next.js) |
+| wfml.wcma.work | Lizmap + QGIS Server |
+| parcels.wcma.work | QGIS Server (wimmera_parcels) |
 
 ---
 
 ## 16. Pending Tasks (as of 2026-04-09)
 
-1. Complete SSL wildcard migration (in progress)
-2. Decide fate of Lizmap stack on wfml.wcma.work
+1. Decide fate of Lizmap stack on wfml.wcma.work
 3. Update wfmc Android app URLs (`lib/services/settings_store.dart`) to wfml.wcma.work
 4. AWS Parameter Store for secrets (optional)
 5. Terraform — codify full infrastructure (mandatory)
