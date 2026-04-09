@@ -816,7 +816,18 @@ All apps to serve on both HTTP and HTTPS (no redirects).
 - Config is now on-disk and reproducible
 - Runtime dirs (db/, log/, sessions/) excluded from git via `var/.gitignore`
 - Map URL: `https://wfml.wcma.work/index.php/view/map?repository=wfml&project=wfml`
-- Admin panel: `https://wfml.wcma.work/admin.php` (change default admin/admin password on first login)
+- Admin panel: `https://wfml.wcma.work/admin.php`
+- Admin password changed from default.
+
+### Lizmap plugin fix (2026-04-09)
+
+Root cause: nginx inside `qgis/qgis-server:ltr` had rewrite `^/ows/$` (exact match only). Requests to `/ows/lizmap/server.json` fell through to static file lookup → 404. Lizmap Web Client requires this endpoint for version negotiation.
+
+Fix: Custom nginx.conf mounted at `/home/ssm-user/apps/qgis-server/nginx/nginx.conf` with rewrite changed to `^/ows/(.*)$` to pass all sub-paths through FastCGI.
+
+Also added `QGIS_SERVER_LIZMAP_REVEAL_SETTINGS=true` env var to qgis-server compose (required for Lizmap plugin API to respond).
+
+Both changes are in `/home/ssm-user/apps/qgis-server/compose.yaml`.
 
 ---
 
