@@ -808,7 +808,8 @@ All apps to serve on both HTTP and HTTPS (no redirects).
 
 ## 16. Pending Tasks (as of 2026-04-09)
 
-1. Decide fate of Lizmap stack on wfml.wcma.work
+1. Fix hardcoded `testpozi.online` in `mapnj2/app-src/app/api/fields/geojson/route.js:3` — update `WFS_BASE_URL` to call qgis-server container directly
+2. Decide fate of Lizmap stack on wfml.wcma.work
 3. Update wfmc Android app URLs (`lib/services/settings_store.dart`) to wfml.wcma.work
 4. AWS Parameter Store for secrets (optional)
 5. Terraform — codify full infrastructure (mandatory)
