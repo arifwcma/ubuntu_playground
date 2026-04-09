@@ -758,26 +758,59 @@ https://wfml.wcma.work/ows/?MAP=/var/www/qgis_projects/wfml/wfml.qgs&SERVICE=WMS
 
 **Reminder:** Update wfmc base URL from `https://wimmera.xyz/qgis/` to `https://wfml.wcma.work/ows/` and MAP path from `/srv/data/wfml/wfml.qgs` to `/var/www/qgis_projects/wfml/wfml.qgs`.
 
-### Blocker
-Raster data files missing. Upload `data.zip` from PC via S3:
-```bash
-aws s3 cp "C:\Users\m.rahman\WebstormProjects\wfml\data.zip" s3://wcma-wfml-data/
-```
-Then on server:
+### Raster data — DONE
+Uploaded `data.zip` to S3 bucket `wcma-wfml-data`, then on server:
 ```bash
 aws s3 cp s3://wcma-wfml-data/data.zip /tmp/data.zip
-unzip /tmp/data.zip -d /home/ssm-user/apps/qgis-server/data/
+unzip /tmp/data.zip -d /home/ssm-user/apps/qgis-server/projects/wfml/
 rm /tmp/data.zip
-docker restart qgis-server
 ```
+Extracted folders (`depth/`, `wcma_boundary/`) moved into `projects/wfml/data/` to match relative paths in `wfml.qgs`.
+WMS endpoint confirmed 200 OK.
 
 ---
 
-## 15. Pending Tasks (as of 2026-04-08)
+## 15. SSL Migration — In Progress (2026-04-09)
 
-1. Upload wfml raster data files (data.zip via S3 — in progress)
+### Goal
+Replace all individual per-domain certs with a single wildcard cert `*.wcma.work` (plus apex `wcma.work`).
+Also replace `testpozi.online` with `parcels.wcma.work`.
+All apps to serve on both HTTP and HTTPS (no redirects).
+
+### IAM permissions added to EC2-SSM-Role
+- `AmazonS3ReadOnlyAccess` — for S3 data download
+- Inline policy for Route 53 DNS-01 challenge:
+  - `route53:ListHostedZones`
+  - `route53:GetChange`
+  - `route53:ChangeResourceRecordSets`
+
+### Steps completed
+- AWS CLI v2 installed on host
+- `certbot` and `python3-certbot-dns-route53` installed on host
+- Wildcard cert issuance in progress (DNS-01 via Route 53)
+
+### Cert command (run once)
+```bash
+sudo certbot certonly --dns-route53 \
+  --config-dir /home/ssm-user/apps/reverse-proxy/certbot/conf \
+  --work-dir /tmp/certbot-work \
+  --logs-dir /tmp/certbot-logs \
+  -d wcma.work -d '*.wcma.work' \
+  --agree-tos --email arif@wcma.work --no-eff-email
+```
+
+### After cert issued
+- Rewrite nginx config: all domains serve on HTTP + HTTPS, wildcard cert paths, testpozi.online → parcels.wcma.work
+- Update auto-renew cron to use host certbot (not Docker)
+- Remove old individual certs
+
+---
+
+## 16. Pending Tasks (as of 2026-04-09)
+
+1. Complete SSL wildcard migration (in progress)
 2. Decide fate of Lizmap stack on wfml.wcma.work
-3. Update wfmc Android app URL to wfml.wcma.work
-4. TASK-09: AWS Parameter Store for secrets (optional)
-5. TASK-10: Terraform — codify full infrastructure (mandatory)
+3. Update wfmc Android app URLs (`lib/services/settings_store.dart`) to wfml.wcma.work
+4. AWS Parameter Store for secrets (optional)
+5. Terraform — codify full infrastructure (mandatory)
 6. Security: Add authentication on QGIS Server
