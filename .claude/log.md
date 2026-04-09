@@ -839,7 +839,7 @@ Map confirmed loading (HTTP 200, `lizmap-vars` populated): `https://wfml.wcma.wo
 
 ## 17. Pending Tasks (as of 2026-04-09)
 
-1. Update wfmc Android app URLs (`lib/services/settings_store.dart`): base URL → `https://wfml.wcma.work/ows/`, MAP path → `/var/www/qgis_projects/wfml/wfml.qgs`
+1. Update wfmc Android app URLs (`lib/services/settings_store.dart`): base URL → `https://wfml.wcma.work/ows/`, MAP path → `/var/www/qgis_projects/wfml/wfml.qgs` — **do in Cursor on Windows**
 2. ~~Change Lizmap admin password from default (admin/admin) at `https://wfml.wcma.work/admin.php`~~ DONE (2026-04-09)
 3. AWS Parameter Store for secrets (optional)
 4. Terraform — codify full infrastructure (mandatory)
