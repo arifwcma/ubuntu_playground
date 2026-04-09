@@ -1,0 +1,84 @@
+Dear Agent,
+
+I am your ancestor who spent a full day getting the wfml Lizmap map working. Here is everything you need to know to pick up where I left off.
+
+---
+
+WHAT WE ARE BUILDING
+
+A self-hosted GIS server on AWS EC2 (Ubuntu 24.04, t3.medium, IP 16.176.28.146). All apps run in Docker on a shared network called internal-apps. Nginx is the sole public entry point. Access is via AWS SSM only -- no SSH.
+
+The stack serves:
+- wcma.work → mapnj2 (Next.js app)
+- xyz.wcma.work → xyz (Next.js app)
+- wfml.wcma.work → Lizmap web UI + QGIS Server (flood maps)
+- parcels.wcma.work → QGIS Server (wimmera parcels)
+
+Read log.md in full before doing anything. It documents every config file, every compose.yaml, every fix applied. It is the single source of truth.
+
+---
+
+WHAT WORKS AS OF 2026-04-09
+
+- All domains serving HTTP + HTTPS with wildcard cert (*.wcma.work), auto-renewing via systemd certbot.timer.
+- mapnj2, xyz, qgis-server, lizmap all running.
+- Lizmap map loads and displays correctly at: https://wfml.wcma.work/index.php/view/map?repository=wfml&project=wfml
+- QGIS WMS endpoint confirmed working: https://wfml.wcma.work/ows/?MAP=/var/www/qgis_projects/wfml/wfml.qgs&SERVICE=WMS&REQUEST=GetCapabilities
+
+---
+
+CRITICAL THINGS TO KNOW (hard-won, do not repeat mistakes)
+
+1. The qgis/qgis-server:ltr container has a custom nginx.conf mounted at
+   /home/ssm-user/apps/qgis-server/nginx/nginx.conf
+   This is required because the default rewrite only matched /ows/ exactly.
+   Do NOT remove this volume mount.
+
+2. QGIS server requires these env vars (already in compose.yaml):
+   - QGIS_SERVER_LIZMAP_REVEAL_SETTINGS=true
+   - QGIS_PLUGINPATH=/opt/qgis-server/plugins
+
+3. Lizmap server plugin must be >= 2.13.0. Currently 2.14.1 at:
+   /home/ssm-user/apps/qgis-server/plugins/lizmap_server/
+   Plugin is owned by ssm-user. If you ever re-extract it, use sudo then chown back to ssm-user.
+
+4. Lizmap 3.9 defaults to requiring Py-QGIS-Server. We use plain FCGI.
+   allowFcgi=on is set under [qgisWrapper] in:
+   /home/ssm-user/apps/lizmap/var/config/localconfig.ini.php
+   Do NOT remove this.
+
+5. Nginx rate limit for wfml.wcma.work is 60r/s with burst=100.
+   Lizmap fires 20+ parallel requests on page load. Lower values cause 503s.
+
+6. Lizmap bind mounts (not named volumes) are at /home/ssm-user/apps/lizmap/var/ and /home/ssm-user/apps/lizmap/www/. Config, DB, and logs live there. The var/ directory has a .gitignore to exclude runtime files.
+
+---
+
+WHAT GURU MIGHT ASK YOU TO DO
+
+The active task list (from log.md section 17):
+
+1. Terraform -- codify the full infrastructure. This is the main pending task.
+   Scope: EC2, VPC/security groups, Route 53, IAM, S3. Docker compose files stay as-is.
+
+2. Test wfmc (Flutter/Android app) against new wfml endpoint.
+   Guru will first update lib/services/settings_store.dart in Cursor on Windows:
+     defaultBaseEndpoint → https://wfml.wcma.work/ows/
+     defaultMapPath → /var/www/qgis_projects/wfml/wfml.qgs
+   The app talks directly to QGIS WMS (not via Lizmap).
+
+3. Test mapnj2 mobile experience end-to-end.
+
+---
+
+COMMUNICATION RULES (read CLAUDE.md for full detail)
+
+- Address Guru as "Guru".
+- Start every response with R1, R2, R3... incrementing each reply.
+- Be brief. One sentence if possible. One recommendation at a time.
+- Numbered lists only. No bullet points. No em dashes.
+- No comments in code. Ever. Guru discards responses that contain them.
+- Australian English spelling.
+- Update log.md and git push after any significant action.
+
+Good luck.

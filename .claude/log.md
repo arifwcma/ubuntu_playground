@@ -839,8 +839,18 @@ Map confirmed loading (HTTP 200, `lizmap-vars` populated): `https://wfml.wcma.wo
 
 ## 17. Pending Tasks (as of 2026-04-09)
 
-1. Update wfmc Android app URLs (`lib/services/settings_store.dart`): base URL → `https://wfml.wcma.work/ows/`, MAP path → `/var/www/qgis_projects/wfml/wfml.qgs` — **do in Cursor on Windows**
-2. ~~Change Lizmap admin password from default (admin/admin) at `https://wfml.wcma.work/admin.php`~~ DONE (2026-04-09)
-3. AWS Parameter Store for secrets (optional)
-4. Terraform — codify full infrastructure (mandatory)
-5. Security: Add authentication on QGIS Server — **won't do for now** (MAP whitelist in Nginx limits access to whitelisted projects only; full auth would create friction for 3rd party WMS consumers; revisit if requirements change)
+### Active
+
+1. Terraform — codify full infrastructure (mandatory). Covers: EC2, VPC/security groups, Route 53, IAM, S3. Docker compose files stay as-is; Terraform provisions the host and runs a startup script.
+2. Test wfmc (Android app) against new wfml QGIS Server endpoint — requires URL update in `lib/services/settings_store.dart` first (do in Cursor on Windows): base URL → `https://wfml.wcma.work/ows/`, MAP path → `/var/www/qgis_projects/wfml/wfml.qgs`
+3. Test mapnj2 mobile experience end-to-end.
+
+### Not Now
+
+1. Update wfmc Android app URLs (`lib/services/settings_store.dart`) — **do in Cursor on Windows** (prerequisite for active item 2 above)
+2. AWS Parameter Store for secrets (optional, low urgency)
+3. Security: Add authentication on QGIS Server — **won't do for now** (MAP whitelist in Nginx limits access to whitelisted projects only; full auth would create friction for 3rd party WMS consumers; revisit if requirements change)
+
+### Done
+
+- ~~Change Lizmap admin password from default (admin/admin)~~ DONE (2026-04-09)
