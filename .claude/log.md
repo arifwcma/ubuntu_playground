@@ -819,15 +819,15 @@ All apps to serve on both HTTP and HTTPS (no redirects).
 - Admin panel: `https://wfml.wcma.work/admin.php`
 - Admin password changed from default.
 
-### Lizmap plugin fix (2026-04-09)
+### Lizmap plugin fix attempt (2026-04-09) — DID NOT RESOLVE "map cannot be displayed"
 
-Root cause: nginx inside `qgis/qgis-server:ltr` had rewrite `^/ows/$` (exact match only). Requests to `/ows/lizmap/server.json` fell through to static file lookup → 404. Lizmap Web Client requires this endpoint for version negotiation.
+Attempted fixes (both applied, both still active):
+1. Mounted custom `nginx.conf` at `/home/ssm-user/apps/qgis-server/nginx/nginx.conf` -- changed rewrite from `^/ows/$` to `^/ows/(.*)$` so sub-paths like `/ows/lizmap/server.json` route through FastCGI instead of falling back to static file (was returning 404).
+2. Added `QGIS_SERVER_LIZMAP_REVEAL_SETTINGS=true` to qgis-server env vars in `compose.yaml`.
 
-Fix: Custom nginx.conf mounted at `/home/ssm-user/apps/qgis-server/nginx/nginx.conf` with rewrite changed to `^/ows/(.*)$` to pass all sub-paths through FastCGI.
+Result: `http://qgis-server:80/ows/lizmap/server.json` now returns 200 with valid JSON (plugin loads, LIZMAP service listed). But the Lizmap UI still shows "This map cannot be displayed."
 
-Also added `QGIS_SERVER_LIZMAP_REVEAL_SETTINGS=true` env var to qgis-server compose (required for Lizmap plugin API to respond).
-
-Both changes are in `/home/ssm-user/apps/qgis-server/compose.yaml`.
+Do NOT retry these two fixes -- they are already applied and confirmed working. The problem is elsewhere.
 
 ---
 
